@@ -1,3 +1,6 @@
+select *
+from "swuOpportunities";
+
 with opps as (select opportunities.id,
                      (CASE
                           WHEN versions."createdAt" > statuses."createdAt" THEN versions."createdAt"
@@ -15,15 +18,15 @@ with opps as (select opportunities.id,
               from "swuOpportunities" as opportunities
                        inner join
                    "swuOpportunityStatuses" as statuses on opportunities.id = statuses.opportunity and
-                                                             statuses."createdAt" = (select max("createdAt")
-                                                                                       from "swuOpportunityStatuses" as statuses2
-                                                                                       where statuses2.opportunity = opportunities.id
-                                                                                         and statuses2.status is not null)
+                                                           statuses."createdAt" = (select max("createdAt")
+                                                                                   from "swuOpportunityStatuses" as statuses2
+                                                                                   where statuses2.opportunity = opportunities.id
+                                                                                     and statuses2.status is not null)
                        inner join
                    "swuOpportunityVersions" as versions on opportunities.id = versions.opportunity and
-                                                             versions."createdAt" = (select max("createdAt")
-                                                                                       from "swuOpportunityVersions" as versions2
-                                                                                       where versions2.opportunity = opportunities.id)),
+                                                           versions."createdAt" = (select max("createdAt")
+                                                                                   from "swuOpportunityVersions" as versions2
+                                                                                   where versions2.opportunity = opportunities.id)),
      props as (select proposals.opportunity,
                       proposals.id                        as "propsId",
                       (CASE
@@ -43,14 +46,25 @@ with opps as (select opportunities.id,
                     "swuProposalStatuses" as statuses
                     on proposals.id = statuses.proposal and statuses.status is not null and
                        statuses."createdAt" = (select max("createdAt")
-                                                 from "swuProposalStatuses" as statuses2
-                                                 where statuses2.proposal = proposals.id
-                                                   and statuses2.status is not null)
+                                               from "swuProposalStatuses" as statuses2
+                                               where statuses2.proposal = proposals.id
+                                                 and statuses2.status is not null)
                WHERE statuses.status != 'DRAFT'
                GROUP BY proposals.opportunity, proposals."anonymousProponentName", proposals.id, statuses.status,
                         statuses."createdAt"
                ORDER BY statuses."createdAt" desc),
-     orgs as (select id as "orgsId", "legalName", city, region, country from organizations),
+     orgs as (select org.id                  as "orgsId",
+                     org."legalName",
+                     org.city,
+                     org.region,
+                     org.country,
+                     count(aff.organization) as "orgSize"
+              from organizations as org
+                       inner join affiliations as aff on org.id = aff.organization
+              where org."acceptedSWUTerms" IS NOT NULL
+                AND org.active = true
+                AND aff."membershipStatus" = 'ACTIVE'
+              group by org.id, org."legalName"),
      questions as (select sum(score) as "maxQuestionScore", "opportunityVersion" as "questionsOppVersion"
                    from "swuTeamQuestions"
                    group by "opportunityVersion")
